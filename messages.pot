@@ -1,0 +1,333 @@
+# Translations template for PROJECT.
+# Copyright (C) 2026 ORGANIZATION
+# This file is distributed under the same license as the PROJECT project.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2026.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PROJECT VERSION\n"
+"Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
+"POT-Creation-Date: 2026-03-06 19:40+0000\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.17.0\n"
+
+#: app.py:93
+msgid "请先登录"
+msgstr ""
+
+#: app.py:253 app.py:344
+#, python-brace-format
+msgid "欢迎回来，{}!"
+msgstr ""
+
+#: app.py:276
+msgid "OAuth 认证失败 (state mismatch)"
+msgstr ""
+
+#: app.py:295
+msgid "OAuth token 错误"
+msgstr ""
+
+#: app.py:314
+msgid "GitHub 用户信息获取失败"
+msgstr ""
+
+#: app.py:351
+msgid "已成功退出登录"
+msgstr ""
+
+#: app.py:398 app.py:405
+msgid "没有选择文件"
+msgstr ""
+
+#: app.py:422
+msgid "没有有效文件"
+msgstr ""
+
+#: app.py:450
+msgid "package.json 文件不存在或格式错误"
+msgstr ""
+
+#: app.py:464
+#, python-format
+msgid "包 %(name)s 版本 %(version)s 已存在"
+msgstr ""
+
+#: app.py:480
+#, python-format
+msgid "包 %(name)s %(version)s 上传成功!"
+msgstr ""
+
+#: app.py:485
+#, python-brace-format
+msgid "上传失败: {}"
+msgstr ""
+
+#: app.py:651
+msgid "包版本不存在或没有删除权限"
+msgstr ""
+
+#: app.py:679
+#, python-brace-format
+msgid "包 {}的所有版本已删除"
+msgstr ""
+
+#: app.py:682
+#, python-brace-format
+msgid "包 {} 版本 {} 已删除"
+msgstr ""
+
+#: templates/404.html:3
+msgid "页面不存在"
+msgstr ""
+
+#: templates/404.html:8
+msgid "抱歉，您请求的页面不存在。"
+msgstr ""
+
+#: templates/404.html:10
+msgid "返回首页"
+msgstr ""
+
+#: templates/500.html:3
+msgid "服务器错误"
+msgstr ""
+
+#: templates/500.html:8
+msgid "抱歉，服务器遇到了问题。请稍后再试。"
+msgstr ""
+
+#: templates/500.html:10
+msgid "刷新页面"
+msgstr ""
+
+#: templates/base.html:7 templates/base.html:84
+msgid "MicroPython 包仓库"
+msgstr ""
+
+#: templates/base.html:95 templates/dashboard.html:3 templates/dashboard.html:9
+msgid "我的面板"
+msgstr ""
+
+#: templates/base.html:98 templates/dashboard.html:15 templates/upload.html:40
+msgid "上传包"
+msgstr ""
+
+#: templates/base.html:122
+msgid "仪表板"
+msgstr ""
+
+#: templates/base.html:124
+msgid "退出登录"
+msgstr ""
+
+#: templates/base.html:153
+msgid "MicroPython 包仓库 &copy; 2026 | 联系我们: 1069653183@qq.com"
+msgstr ""
+
+#: templates/dashboard.html:11
+msgid "欢迎回来"
+msgstr ""
+
+#: templates/dashboard.html:25
+msgid "我上传的包总数"
+msgstr ""
+
+#: templates/dashboard.html:33
+msgid "我上传的包"
+msgstr ""
+
+#: templates/dashboard.html:40
+msgid "包名"
+msgstr ""
+
+#: templates/dashboard.html:41
+msgid "最新版本"
+msgstr ""
+
+#: templates/dashboard.html:42
+msgid "描述"
+msgstr ""
+
+#: templates/dashboard.html:62 templates/index.html:52 templates/search.html:34
+msgid "暂无描述"
+msgstr ""
+
+#: templates/dashboard.html:72
+msgid "您还没有上传任何包"
+msgstr ""
+
+#: templates/dashboard.html:73
+msgid "点击这里上传第一个包"
+msgstr ""
+
+#: templates/index.html:3
+msgid "首页"
+msgstr ""
+
+#: templates/index.html:9
+msgid "一个类似 PyPI 的 MicroPython 包管理仓库。上传、分享和发现 MicroPython 包。"
+msgstr ""
+
+#: templates/index.html:15 templates/search.html:69
+msgid "上传新包"
+msgstr ""
+
+#: templates/index.html:26
+msgid "总包数量"
+msgstr ""
+
+#: templates/index.html:34
+msgid "最新上传的包"
+msgstr ""
+
+#: templates/index.html:82
+msgid "暂无包上传，成为第一个上传者吧！"
+msgstr ""
+
+#: templates/index.html:87
+msgid "如何上传？"
+msgstr ""
+
+#: templates/index.html:89
+msgid "登录您的 GitHub 账户"
+msgstr ""
+
+#: templates/index.html:90
+msgid "上传一个包含 package.json 的包"
+msgstr ""
+
+#: templates/package.html:20
+msgid "更新时间"
+msgstr ""
+
+#: templates/package.html:28
+msgid "下载"
+msgstr ""
+
+#: templates/package.html:33
+msgid "删除"
+msgstr ""
+
+#: templates/package.html:45
+msgid "安装包"
+msgstr ""
+
+#: templates/package.html:49
+msgid "本地安装"
+msgstr ""
+
+#: templates/package.html:53
+msgid "远程安装"
+msgstr ""
+
+#: templates/package.html:63
+msgid "版本选择"
+msgstr ""
+
+#: templates/package.html:97
+msgid "文件列表"
+msgstr ""
+
+#: templates/package.html:148
+msgid "只显示前 20 个文件"
+msgstr ""
+
+#: templates/package.html:152
+msgid "此版本暂无文件信息"
+msgstr ""
+
+#: templates/package.html:168
+msgid "删除确认"
+msgstr ""
+
+#: templates/package.html:173
+msgid "确定删除版本"
+msgstr ""
+
+#: templates/package.html:177
+msgid "此操作将删除该版本的所有文件，且无法恢复！"
+msgstr ""
+
+#: templates/package.html:183 templates/upload.html:37
+msgid "取消"
+msgstr ""
+
+#: templates/package.html:187
+msgid "确认"
+msgstr ""
+
+#: templates/search.html:3
+msgid "搜索"
+msgstr ""
+
+#: templates/search.html:8
+msgid "搜索包"
+msgstr ""
+
+#: templates/search.html:65
+msgid "没有找到相关包"
+msgstr ""
+
+#: templates/search.html:66
+msgid "尝试使用其他关键词搜索，或上传一个新包"
+msgstr ""
+
+#: templates/upload.html:3
+msgid "上传"
+msgstr ""
+
+#: templates/upload.html:9
+msgid "上传 MicroPython 包"
+msgstr ""
+
+#: templates/upload.html:17
+msgid "请选择包文件夹"
+msgstr ""
+
+#: templates/upload.html:24
+msgid "已选择文件"
+msgstr ""
+
+#: templates/upload.html:29
+msgid "上传要求"
+msgstr ""
+
+#: templates/upload.html:31
+msgid "必须包含 package.json 文件"
+msgstr ""
+
+#: templates/upload.html:32
+msgid "字段必须包含"
+msgstr ""
+
+#: templates/upload.html:50
+msgid "包文件夹结构"
+msgstr ""
+
+#: templates/upload.html:66
+msgid "package.json 规范说明"
+msgstr ""
+
+#: templates/upload.html:71
+msgid "最小必需字段"
+msgstr ""
+
+#: templates/upload.html:79
+msgid "MicroPython (mip) 解析字段"
+msgstr ""
+
+#: templates/upload.html:92
+msgid "upypi平台扩展字段（可选）"
+msgstr ""
+
+#: templates/upload.html:95
+msgid "chips 表示该包依赖特定芯片，fw 表示依赖特定固件"
+msgstr ""
+

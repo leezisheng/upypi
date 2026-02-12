@@ -1,18 +1,18 @@
 {% extends "base.html" %}
 
-{% block title %}我的面板 - MicroPython MIP 仓库{% endblock %}
+{% block title %}{% trans %}我的面板{% endtrans %}{% endblock %}
 
 {% block content %}
 <div class="row mb-4">
     <div class="col-md-8">
         <h1 class="mb-3">
-            <i class="bi bi-speedometer2"></i> 我的面板
+            <i class="bi bi-speedometer2"></i> {% trans %}我的面板{% endtrans %}
         </h1>
-        <p class="lead">欢迎回来，{{ user.login }}！</p>
+        <p class="lead">{% trans %}欢迎回来{% endtrans %}，{{ user.login }}！</p>
     </div>
     <div class="col-md-4 text-end">
         <a href="{{ url_for('upload') }}" class="btn btn-success">
-            <i class="bi bi-plus-circle"></i> 上传新包
+            <i class="bi bi-plus-circle"></i> {% trans %}上传包{% endtrans %}
         </a>
     </div>
 </div>
@@ -22,7 +22,7 @@
         <div class="card mb-3">
             <div class="card-body text-center">
                 <h4>{{ packages|length }}</h4>
-                <p class="text-muted">我的包版本</p>
+                <p class="text-muted">{% trans %}我上传的包总数{% endtrans %}</p>
             </div>
         </div>
     </div>
@@ -30,18 +30,16 @@
 
 <div class="row mt-4">
     <div class="col-12">
-        <h3 class="mb-3">我的包版本</h3>
+        <h3 class="mb-3">{% trans %}我上传的包{% endtrans %}</h3>
         
         {% if packages %}
         <div class="table-responsive">
             <table class="table table-hover">
                 <thead>
                     <tr>
-                        <th>包名</th>
-                        <th>版本</th>
-                        <th>描述</th>
-                        <th>上传时间</th>
-                        <th>操作</th>
+                        <th>{% trans %}包名{% endtrans %}</th>
+                        <th>{% trans %}最新版本{% endtrans %}</th>
+                        <th>{% trans %}描述{% endtrans %}</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -59,53 +57,10 @@
                         </td>
                         <td>
                             {% if package.description %}
-                                {{ package.description[:50] }}{% if package.description|length > 50 %}...{% endif %}
+                                {{ package.description[:80] }}{% if package.description|length > 80 %}...{% endif %}
                             {% else %}
-                                <span class="text-muted">暂无描述</span>
+                                <span class="text-muted">{% trans %}暂无描述{% endtrans %}</span>
                             {% endif %}
-                        </td>
-                        <td>{{ package.created_at[:10] }}</td>
-                        <td>
-                            <div class="btn-group btn-group-sm">
-                                <a href="{{ url_for('package_detail', name=package.name, version=package.version) }}" 
-                                   class="btn btn-outline-primary">
-                                    查看
-                                </a>
-                                <a href="{{ url_for('download_package', name=package.name, version=package.version) }}"
-                                   class="btn btn-outline-success">
-                                    下载
-                                </a>
-                                <button type="button" class="btn btn-outline-danger" 
-                                        data-bs-toggle="modal" 
-                                        data-bs-target="#deleteModal{{ loop.index }}">
-                                    删除
-                                </button>
-                            </div>
-                            
-                            <!-- 删除确认模态框 -->
-                            <div class="modal fade" id="deleteModal{{ loop.index }}" tabindex="-1">
-                                <div class="modal-dialog">
-                                    <div class="modal-content">
-                                        <div class="modal-header">
-                                            <h5 class="modal-title">确认删除</h5>
-                                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                                        </div>
-                                        <div class="modal-body">
-                                            <p>确定要删除包 <strong>{{ package.name }}</strong> 的版本 <strong>{{ package.version }}</strong> 吗？</p>
-                                            <p class="text-danger">
-                                                <i class="bi bi-exclamation-triangle"></i>
-                                                此操作将删除此版本的所有文件，且无法恢复！
-                                            </p>
-                                        </div>
-                                        <div class="modal-footer">
-                                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
-                                            <form action="{{ url_for('delete_package_version', name=package.name, version=package.version) }}" method="post">
-                                                <button type="submit" class="btn btn-danger">确认删除</button>
-                                            </form>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
                         </td>
                     </tr>
                     {% endfor %}
@@ -114,8 +69,8 @@
         </div>
         {% else %}
         <div class="alert alert-info">
-            您还没有上传任何包。
-            <a href="{{ url_for('upload') }}" class="alert-link">点击这里上传第一个包</a>
+            {% trans %}您还没有上传任何包{% endtrans %}。
+            <a href="{{ url_for('upload') }}" class="alert-link">{% trans %}点击这里上传第一个包{% endtrans %}</a>
         </div>
         {% endif %}
     </div>

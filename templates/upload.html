@@ -1,12 +1,12 @@
 {% extends "base.html" %}
 
-{% block title %}上传包 - MicroPython MIP 仓库{% endblock %}
+{% block title %}{% trans %}上传{% endtrans %}{% endblock %}
 
 {% block content %}
 <div class="row">
     <div class="col-md-8 mx-auto">
         <h1 class="mb-4">
-            <i class="bi bi-upload"></i> 上传 MicroPython 包
+            <i class="bi bi-upload"></i> {% trans %}上传 MicroPython 包{% endtrans %}
         </h1>
         
         <div class="card">
@@ -14,37 +14,30 @@
                 <form method="post" enctype="multipart/form-data" id="uploadForm">
                     <div class="mb-4">
                         <label for="files" class="form-label">
-                            <strong>选择包文件夹或文件</strong>
+                            <strong>{% trans %}请选择包文件夹{% endtrans %}</strong>
                         </label>
                         <input class="form-control" type="file" name="files" id="files" 
                                multiple webkitdirectory directory required>
-                        <div class="form-text">
-                            请选择包文件夹或按住 Ctrl 键选择多个文件。必须包含一个 <code>package.json</code> 文件。
-                            <br>使用 <code>webkitdirectory</code> 属性（Chrome/Edge）可以直接选择文件夹。
-                        </div>
                     </div>
                     
                     <div id="fileList" class="mb-3" style="display: none;">
-                        <h6>已选择文件：</h6>
+                        <h6>{% trans %}已选择文件{% endtrans %}：</h6>
                         <ul id="fileItems" class="list-group list-group-flush small"></ul>
                     </div>
                     
                     <div class="alert alert-info">
-                        <h5><i class="bi bi-info-circle"></i> 上传要求：</h5>
+                        <h5><i class="bi bi-info-circle"></i> {% trans %}上传要求{% endtrans %}：</h5>
                         <ul>
-                            <li>必须包含 <code>package.json</code> 文件</li>
-                            <li><code>package.json</code> 必须包含 <code>name</code>,<code>version</code>,<code>urls</code>字段</li>
-                            <li>建议包含 <code>README.md</code> 文件用于文档</li>
-                            <li>包名应该小写，使用连字符分隔单词</li>
-                            <li>支持上传整个文件夹（Chrome/Edge浏览器）</li>
+                            <li>{% trans %}必须包含 package.json 文件{% endtrans %}</li>
+                            <li><code>package.json</code> {% trans %}字段必须包含{% endtrans %}<code>name</code>,<code>version</code></li>
                         </ul>
                     </div>
                     
                     <div class="d-grid gap-2 d-md-flex justify-content-md-end">
-                        <a href="{{ url_for('dashboard') }}" class="btn btn-secondary me-md-2">取消</a>
+                        <a href="{{ url_for('dashboard') }}" class="btn btn-secondary me-md-2">{% trans %}取消{% endtrans %}</a>
                         <button type="submit" class="btn btn-primary" id="submitBtn">
                             <span class="spinner-border spinner-border-sm d-none" role="status" id="loadingSpinner"></span>
-                            上传包
+                            {% trans %}上传包{% endtrans %}
                         </button>
                     </div>
                 </form>
@@ -53,24 +46,64 @@
         
         <div class="card mt-4">
             <div class="card-header">
-                <i class="bi bi-file-earmark-code"></i> package.json 示例
+                <i class="bi bi-folder"></i>
+                {% trans %}包文件夹结构{% endtrans %}
             </div>
+
             <div class="card-body">
+                <pre><code>example-package/
+        ├── package.json
+        ├── README.md
+        └── src/
+            └── example.py
+        </code></pre>
+            </div>
+        </div>
+
+        <div class="card mt-4">
+            <div class="card-header">
+                <i class="bi bi-file-earmark-code"></i>
+                {% trans %}package.json 规范说明{% endtrans %}
+            </div>
+
+            <div class="card-body">
+                <!-- 最小字段 -->
+                <h5 class="mt-3">{% trans %}最小必需字段{% endtrans %}</h5>
                 <pre><code>{
-  "name": "my-micropython-package",
-  "version": "1.0.0",
-  "urls": [
-    ["package.py", "src/package.py"]
-  ],
-  "description": "我的 MicroPython 包描述",
-  "author": "Your Name",
-  "license": "MIT",
-  "keywords": ["micropython", "iot", "sensor"],
-  "url": "https://github.com/username/repository",
-  "dependencies": {
-    "other-package": ">=1.0.0"
-  }
-}</code></pre>
+        "name": "example-package",
+        "version": "1.0.0"
+        }</code></pre>
+
+                <!-- mip 字段 -->
+                <h5 class="mt-4">
+                    {% trans %}MicroPython (mip) 解析字段{% endtrans %}
+                </h5>
+                <pre><code>{
+        "urls": [
+            ["example.py", "src/example.py"]
+        ],
+        "deps": [
+            ["github:org/repo", "main"]
+        ]
+        }</code></pre>
+
+                <!-- 扩展字段 -->
+                <h5 class="mt-4">
+                    {% trans %}upypi平台扩展字段（可选）{% endtrans %}
+                    <i class="bi bi-info-circle text-muted"
+                    data-bs-toggle="tooltip"
+                    title="{% trans %}chips 表示该包依赖特定芯片，fw 表示依赖特定固件{% endtrans %}">
+                    </i>
+                </h5>
+
+                <pre><code>{
+        "description": "Example package",
+        "chips": ["STM32F407", "ESP32"],
+        "fw": ["ulab", "lvgl"],
+        "author": "Your Name",
+        "license": "MIT"
+        }</code></pre>
+
             </div>
         </div>
     </div>
@@ -118,6 +151,16 @@ document.addEventListener('DOMContentLoaded', function() {
         loadingSpinner.classList.remove('d-none');
         submitBtn.disabled = true;
         submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span> 上传中...';
+    });
+});
+
+document.addEventListener("DOMContentLoaded", function () {
+    var tooltipTriggerList = [].slice.call(
+        document.querySelectorAll('[data-bs-toggle="tooltip"]')
+    );
+
+    tooltipTriggerList.map(function (el) {
+        return new bootstrap.Tooltip(el);
     });
 });
 </script>

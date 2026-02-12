@@ -1,14 +1,19 @@
 # Upypi
+MicroPython MIP 包管理仓库
 
-## 项目概述
+## 翻译
+1. 初始化
+    * pybabel extract -F babel.cfg -o messages.pot .
+    * pybabel init -i messages.pot -d translations -l zh
+    * pybabel init -i messages.pot -d translations -l en
+2. 更新
+    * pybabel extract -F babel.cfg -o messages.pot .
+    * pybabel update -i messages.pot -d translations
+    * pybabel compile -d translations
 
 ## 运行项目
-1. 安装依赖：apt install nginx python3-flask python3-requests python3-markdown python3-gunicorn
-2. python3 -m gunicorn -w 2 -k gthread --threads 4 -b 127.0.0.1:5000 app:app
-
-## 测试
-构建容器沙箱
+1. 构建容器：podman build -t upypi .
+2. 运行容器：podman run -d -p 8080:443 upypi 自行准备证书文件与持久化目录
 
 ## 项目演示
-
 https://upypi.net

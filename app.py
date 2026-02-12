@@ -1,38 +1,47 @@
 import os
-import json
 import shutil
-import sqlite3
 from pathlib import Path
-from datetime import datetime
-from functools import wraps
+from functools import wraps, lru_cache
+
+import json
+import sqlite3
+
+import requests
 import markdown
-from markdown.extensions.codehilite import CodeHiliteExtension
-from markdown.extensions.extra import ExtraExtension
 
 from flask import Flask, render_template, request, redirect, url_for, session, flash, send_from_directory, abort
-import requests
+from flask_babel import Babel, gettext as _
 
 # 配置
 GITHUB_CLIENT_ID = os.getenv('GITHUB_CLIENT_ID')
 GITHUB_CLIENT_SECRET = os.getenv('GITHUB_CLIENT_SECRET')
-FLASK_SECRET = os.getenv('FLASK_SECRET')
-if not GITHUB_CLIENT_ID:
-    raise RuntimeError("GITHUB_CLIENT_ID is not set in the environment.")
-if not GITHUB_CLIENT_SECRET:
-    raise RuntimeError("GITHUB_CLIENT_SECRET is not set in the environment.")
-if not FLASK_SECRET:
-    raise RuntimeError("FLASK_SECRET is not set in the environment.")
+FLASK_SECRET = 'abc'
+# if not GITHUB_CLIENT_ID:
+#     raise RuntimeError("GITHUB_CLIENT_ID is not set in the environment.")
+# if not GITHUB_CLIENT_SECRET:
+#     raise RuntimeError("GITHUB_CLIENT_SECRET is not set in the environment.")
+# if not FLASK_SECRET:
+#     raise RuntimeError("FLASK_SECRET is not set in the environment.")
 
 # 初始化应用
 app = Flask(__name__)
+
 app.config['MAX_CONTENT_LENGTH'] = 10 * 1024 * 1024
+
+app.config['BABEL_DEFAULT_LOCALE'] = 'zh'
+app.config['BABEL_SUPPORTED_LOCALES'] = ['zh', 'en']
+app.config['BABEL_TRANSLATION_DIRECTORIES'] = 'translations'
+
 app.secret_key = FLASK_SECRET
 
-# ---------- 上下文处理器，为所有模板添加当前时间 ----------
-@app.context_processor
-def inject_now():
-    """为所有模板注入当前时间"""
-    return {'now': datetime.now()}
+# 初始化Babel
+babel = Babel(app)
+
+def get_locale():
+    if 'language' in session:
+        return session['language']
+    return request.accept_languages.best_match(app.config['BABEL_SUPPORTED_LOCALES'])
+babel.init_app(app, locale_selector=get_locale)
 
 # ---------- 数据库初始化 ----------
 def init_db():
@@ -58,7 +67,6 @@ def init_db():
             name TEXT NOT NULL,
             version TEXT NOT NULL,
             owner_id INTEGER NOT NULL,
-            description TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (owner_id) REFERENCES users (id),
             UNIQUE(name, version)
@@ -82,7 +90,7 @@ def login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
         if 'user_id' not in session:
-            flash('请先登录', 'error')
+            flash(_('请先登录'), 'error')
             return redirect(url_for('login'))
         return f(*args, **kwargs)
     return decorated_function
@@ -156,10 +164,11 @@ def delete_package(package_name):
     conn.commit()
     conn.close()
 
-def extract_package_info(upload_folder):
-    """从上传的文件夹中提取package.json信息"""
+@lru_cache(maxsize=256)
+def extract_package_info(folder):
+    """从包文件夹中提取package.json信息"""
     # 递归查找package.json
-    for root, dirs, files in os.walk(upload_folder):
+    for root, dirs, files in os.walk(folder):
         if 'package.json' in files:
             package_json_path = Path(root) / 'package.json'
             break
@@ -173,15 +182,8 @@ def extract_package_info(upload_folder):
         # 验证必需字段
         if 'name' not in data or 'version' not in data:
             return None
-            
-        return {
-            'name': data['name'],
-            'version': data['version'],
-            'description': data.get('description', ''),
-            'author': data.get('author', ''),
-            'url': data.get('url', ''),
-            'license': data.get('license', '')
-        }
+        else:
+            return data
     except (json.JSONDecodeError, KeyError) as e:
         app.logger.error(f'解析package.json失败: {str(e)}')
         return None
@@ -210,11 +212,21 @@ def index():
     total_packages = conn.execute('SELECT COUNT(DISTINCT name) as count FROM packages').fetchone()['count']
     
     conn.close()
-    
+
+    for i, pkg in enumerate(recent_packages):
+        pkg = dict(pkg)
+        pkg.update(extract_package_info(Path("pkgs") / pkg["name"] / pkg["version"]))
+        recent_packages[i] = pkg
     return render_template('index.html', 
                          recent_packages=recent_packages,
                          total_packages=total_packages,
                          user=get_current_user())
+
+@app.route('/language/<lang>')
+def set_language(lang):
+    if lang in app.config['BABEL_SUPPORTED_LOCALES']:
+        session['language'] = lang
+    return redirect(request.referrer or url_for('index'))
 
 @app.route('/favicon.ico')
 def favicon():
@@ -223,18 +235,36 @@ def favicon():
 
 @app.route('/login', strict_slashes=False)
 def login():
+    """开发模式：直接登录 test 用户"""
+    conn = get_db()
+    conn.execute(
+        'INSERT OR IGNORE INTO users (github_id, login, name) VALUES (0,"test","test")'
+    )
+    user = conn.execute(
+        'SELECT id FROM users WHERE github_id = 0'
+    ).fetchone()
+
+    conn.commit()
+    conn.close()
+
+    session['user_id'] = user["id"]
+    session['github_login'] = "test"
+
+    flash(_('欢迎回来，{}!').format("test"), 'success')
+    return redirect(url_for('dashboard'))
+
     """GitHub OAuth 登录"""
-    state = os.urandom(16).hex()
-    session['oauth_state'] = state
-    redirect_uri = url_for('callback', _external=True)
+    # state = os.urandom(16).hex()
+    # session['oauth_state'] = state
+    # redirect_uri = url_for('callback', _external=True)
     
-    auth_url = (f"https://github.com/login/oauth/authorize"
-                f"?client_id={GITHUB_CLIENT_ID}"
-                f"&state={state}"
-                f"&redirect_uri={redirect_uri}"
-                f"&scope=read:user")
+    # auth_url = (f"https://github.com/login/oauth/authorize"
+    #             f"?client_id={GITHUB_CLIENT_ID}"
+    #             f"&state={state}"
+    #             f"&redirect_uri={redirect_uri}"
+    #             f"&scope=read:user")
     
-    return redirect(auth_url)
+    # return redirect(auth_url)
 
 @app.route('/callback', strict_slashes=False)
 def callback():
@@ -243,7 +273,7 @@ def callback():
     state = request.args.get('state')
     
     if not code or state != session.get('oauth_state'):
-        flash('OAuth 认证失败 (state mismatch)', 'error')
+        flash(_('OAuth 认证失败 (state mismatch)'), 'error')
         return redirect(url_for('index'))
     
     # 交换 code 获取 access_token
@@ -262,7 +292,7 @@ def callback():
     access_token = token_json.get('access_token')
     
     if not access_token:
-        flash('OAuth token 错误', 'error')
+        flash(_('OAuth token 错误'), 'error')
         return redirect(url_for('index'))
     
     # 获取用户信息
@@ -281,7 +311,7 @@ def callback():
     real_name = user_json.get('name') or login_name
     
     if not github_id:
-        flash('GitHub 用户信息获取失败', 'error')
+        flash(_('GitHub 用户信息获取失败'), 'error')
         return redirect(url_for('index'))
     
     # 插入或更新用户
@@ -311,14 +341,14 @@ def callback():
     session['user_id'] = user_id
     session['github_login'] = login_name
     
-    flash(f'欢迎回来，{login_name}!', 'success')
+    flash(_('欢迎回来，{}!').format(login_name), 'success')
     return redirect(url_for('dashboard'))
 
 @app.route('/logout', strict_slashes=False)
 def logout():
     """退出登录"""
     session.clear()
-    flash('已成功退出登录', 'success')
+    flash(_('已成功退出登录'), 'success')
     return redirect(url_for('index'))
 
 @app.route('/dashboard', strict_slashes=False)
@@ -329,13 +359,27 @@ def dashboard():
     
     conn = get_db()
     user_packages = conn.execute('''
-        SELECT * FROM packages 
-        WHERE owner_id = ? 
-        ORDER BY created_at DESC
-    ''', (user['id'],)).fetchall()
+        SELECT p.*
+        FROM packages p
+        JOIN (
+            SELECT name, MAX(created_at) AS max_created
+            FROM packages
+            WHERE owner_id = ?
+            GROUP BY name
+        ) latest
+        ON p.name = latest.name
+        AND p.created_at = latest.max_created
+        WHERE p.owner_id = ?
+        ORDER BY p.created_at DESC
+    ''', (user['id'], user['id'])).fetchall()
     
     conn.close()
     
+    for i, pkg in enumerate(user_packages):
+        pkg = dict(pkg)
+        pkg.update(extract_package_info(Path("pkgs") / pkg["name"] / pkg["version"]))
+        user_packages[i] = pkg
+
     return render_template('dashboard.html', 
                          user=user,
                          packages=user_packages)
@@ -351,14 +395,14 @@ def upload():
     user = get_current_user()
     
     if 'files' not in request.files:
-        flash('没有选择文件', 'error')
+        flash(_('没有选择文件'), 'error')
         return redirect(request.url)
     
     files = request.files.getlist('files')
     
     # 检查是否选择了文件
     if not files or all(not file.filename for file in files):
-        flash('没有选择文件', 'error')
+        flash(_('没有选择文件'), 'error')
         return redirect(request.url)
     
     # 创建临时目录保存上传的文件
@@ -375,7 +419,7 @@ def upload():
                 file_paths.append(file.filename.replace('\\', '/'))
         
         if not file_paths:
-            flash('没有有效文件', 'error')
+            flash(_('没有有效文件'), 'error')
             return redirect(request.url)
         
         # 找到共同的前缀（最外层目录）
@@ -403,7 +447,7 @@ def upload():
         # 提取 package.json 信息
         package_info = extract_package_info(temp_dir)
         if not package_info:
-            flash('package.json 文件不存在或格式错误', 'error')
+            flash(_('package.json 文件不存在或格式错误'), 'error')
             return redirect(request.url)
         
         package_name = package_info['name']
@@ -417,14 +461,14 @@ def upload():
         ).fetchone()
         
         if existing:
-            flash(f'包 {package_name} 版本 {package_version} 已存在', 'error')
+            flash(_('包 %(name)s 版本 %(version)s 已存在', name=package_name, version=package_version), 'error')
             return redirect(request.url)
         
         # 保存到数据库
         cursor = conn.execute(
-            '''INSERT INTO packages (name, version, owner_id, description) 
-               VALUES (?, ?, ?, ?)''',
-            (package_name, package_version, user['id'], package_info['description'])
+            '''INSERT INTO packages (name, version, owner_id) 
+               VALUES (?, ?, ?)''',
+            (package_name, package_version, user['id'])
         )
         
         conn.commit()
@@ -433,12 +477,12 @@ def upload():
         # 保存包文件到版本目录
         save_package_files_from_dir(package_name, package_version, temp_dir)
         
-        flash(f'包 {package_name} v{package_version} 上传成功!', 'success')
+        flash(_('包 %(name)s %(version)s 上传成功!', name=package_name, version=package_version), 'success')
         return redirect(url_for('package_detail', name=package_name, version=package_version))
         
     except Exception as e:
         app.logger.error(f'上传包时出错: {str(e)}')
-        flash(f'上传失败: {str(e)}', 'error')
+        flash(_('上传失败: {}').format(str(e)), 'error')
         return redirect(request.url)
     finally:
         # 清理临时目录
@@ -515,29 +559,21 @@ def render_markdown(content):
         return ""
     
     try:
-        # 配置 markdown 扩展
-        extensions = [
-            ExtraExtension(),
-            CodeHiliteExtension(
-                css_class='highlight',
-                linenums=False,
-                guess_lang=True
-            ),
-            'fenced_code',
-            'tables',
-            'toc'
-        ]
-        
-        # 渲染 markdown
         html = markdown.markdown(
             content,
-            extensions=extensions,
-            output_format='html'
+            extensions=[
+                "extra",
+                "codehilite",
+                "fenced_code",
+                "tables",
+                "toc"
+            ],
+            output_format="html5"
         )
         return html
     except Exception as e:
-        app.logger.error(f'Markdown 渲染失败: {str(e)}')
-        return f'<pre class="bg-light p-3 border rounded">{content}</pre>'
+        app.logger.error(f"Markdown 渲染失败: {e}")
+        return f"<pre>{content}</pre>"
 
 # 添加 markdown 过滤器
 @app.template_filter('markdown')
@@ -571,7 +607,8 @@ def package_detail(name, version=None):
     current_package = None
     for pkg in package_versions:
         if pkg['version'] == version:
-            current_package = pkg
+            current_package = dict(pkg)
+            current_package.update(extract_package_info(Path("pkgs") / name / version))
             break
     
     if not current_package:
@@ -611,7 +648,7 @@ def delete_package_version(name, version):
     ).fetchone()
     
     if not package:
-        flash('包版本不存在或没有删除权限', 'error')
+        flash(_('包版本不存在或没有删除权限'), 'error')
         return redirect(url_for('package_detail', name=name))
     
     # 删除文件系统中的版本目录
@@ -639,44 +676,13 @@ def delete_package_version(name, version):
         package_dir = Path('pkgs') / name
         if package_dir.exists():
             shutil.rmtree(str(package_dir))
-        flash(f'包 {name} 的所有版本已删除', 'success')
+        flash(_('包 {}的所有版本已删除').format(name), 'success')
         return redirect(url_for('dashboard'))
     else:
-        flash(f'包 {name} 版本 {version} 已删除', 'success')
+        flash(_('包 {} 版本 {} 已删除').format(name, version), 'success')
         # 重定向到最新版本
         latest_version = get_latest_version(name)
         return redirect(url_for('package_detail', name=name, version=latest_version))
-
-@app.route('/pkgs/<name>/delete', methods=['POST'], strict_slashes=False)
-@login_required
-def delete_package_all(name):
-    """删除包的所有版本"""
-    user = get_current_user()
-    
-    conn = get_db()
-    
-    # 检查用户是否有权限删除这个包的所有版本
-    user_packages = conn.execute(
-        'SELECT * FROM packages WHERE name = ? AND owner_id = ?',
-        (name, user['id'])
-    ).fetchall()
-    
-    if not user_packages:
-        flash('包不存在或没有删除权限', 'error')
-        return redirect(url_for('dashboard'))
-    
-    # 删除文件系统中的包目录
-    package_dir = Path('pkgs') / name
-    if package_dir.exists():
-        shutil.rmtree(str(package_dir))
-    
-    # 删除数据库中的所有版本记录
-    conn.execute('DELETE FROM packages WHERE name = ?', (name,))
-    conn.commit()
-    conn.close()
-    
-    flash(f'包 {name} 的所有版本已删除', 'success')
-    return redirect(url_for('dashboard'))
 
 @app.route('/pkgs/<name>/<version>/download', strict_slashes=False)
 def download_package(name, version):
@@ -689,7 +695,6 @@ def download_package(name, version):
     # 创建临时zip文件
     import zipfile
     import tempfile
-    import os
     
     # 创建临时文件
     temp_zip = tempfile.NamedTemporaryFile(delete=False, suffix='.zip')
@@ -748,16 +753,21 @@ def search():
         SELECT p.*, u.login as owner_name 
         FROM packages p 
         JOIN users u ON p.owner_id = u.id 
-        WHERE (p.name LIKE ? OR p.description LIKE ?)
+        WHERE (p.name LIKE ?)
         AND p.created_at = (
             SELECT MAX(created_at) 
             FROM packages p2 
             WHERE p2.name = p.name
         )
         ORDER BY p.created_at DESC
-    ''', (search_pattern, search_pattern)).fetchall()
+    ''', (search_pattern, )).fetchall()
     
     conn.close()
+
+    for i, pkg in enumerate(results):
+        pkg = dict(pkg)
+        pkg.update(extract_package_info(Path("pkgs") / pkg["name"] / pkg["version"]))
+        results[i] = pkg
     
     return render_template('search.html',
                          query=query,
