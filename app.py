@@ -164,8 +164,16 @@ def delete_package(package_name):
     conn.commit()
     conn.close()
 
-@lru_cache(maxsize=256)
 def extract_package_info(folder):
+    """带自动缓存失效的 package.json 读取"""
+    if not folder.exists():
+        return None
+
+    mtime = folder.stat().st_mtime
+    return get_package_info(folder, mtime)
+
+@lru_cache(maxsize=256)
+def get_package_info(folder, mtime):
     """从包文件夹中提取package.json信息"""
     # 递归查找package.json
     for root, dirs, files in os.walk(folder):
@@ -215,7 +223,9 @@ def index():
 
     for i, pkg in enumerate(recent_packages):
         pkg = dict(pkg)
-        pkg.update(extract_package_info(Path("pkgs") / pkg["name"] / pkg["version"]))
+        info = extract_package_info(Path("pkgs") / pkg["name"] / pkg["version"])
+        if info:
+            pkg.update(info)
         recent_packages[i] = pkg
     return render_template('index.html', 
                          recent_packages=recent_packages,
@@ -377,7 +387,9 @@ def dashboard():
     
     for i, pkg in enumerate(user_packages):
         pkg = dict(pkg)
-        pkg.update(extract_package_info(Path("pkgs") / pkg["name"] / pkg["version"]))
+        info = extract_package_info(Path("pkgs") / pkg["name"] / pkg["version"])
+        if info:
+            pkg.update(info)
         user_packages[i] = pkg
 
     return render_template('dashboard.html', 
@@ -608,7 +620,9 @@ def package_detail(name, version=None):
     for pkg in package_versions:
         if pkg['version'] == version:
             current_package = dict(pkg)
-            current_package.update(extract_package_info(Path("pkgs") / name / version))
+            info = extract_package_info(Path("pkgs") / name / version)
+            if info:
+                current_package.update(info)
             break
     
     if not current_package:
@@ -766,7 +780,9 @@ def search():
 
     for i, pkg in enumerate(results):
         pkg = dict(pkg)
-        pkg.update(extract_package_info(Path("pkgs") / pkg["name"] / pkg["version"]))
+        info = extract_package_info(Path("pkgs") / pkg["name"] / pkg["version"])
+        if info:
+            pkg.update(info)
         results[i] = pkg
     
     return render_template('search.html',
