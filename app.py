@@ -1,7 +1,9 @@
 import os
+import stat
 import shutil
+import zipfile
 from pathlib import Path
-from functools import wraps, lru_cache
+from functools import wraps
 
 import json
 import sqlite3
@@ -9,7 +11,7 @@ import sqlite3
 import requests
 import markdown
 
-from flask import Flask, render_template, request, redirect, url_for, session, flash, send_from_directory, abort
+from flask import Flask, render_template, request, redirect, url_for, session, flash, send_from_directory, abort, jsonify
 from flask_babel import Babel, gettext as _
 
 # 配置
@@ -109,92 +111,109 @@ def get_current_user():
     
     return user
 
-def save_package_files(package_name, version, files):
-    """保存上传的包文件到版本目录"""
-    # 版本目录
-    version_dir = Path('pkgs') / package_name / version
-    version_dir.mkdir(parents=True, exist_ok=True)
-    
-    # 保存所有文件，处理路径
-    for file in files:
-        if file.filename:
-            # 处理文件路径，去掉最外层目录
-            file_path = file.filename.replace('\\', '/')
-            
-            # 如果有路径分隔符，去掉第一个部分（最外层目录）
-            if '/' in file_path:
-                parts = file_path.split('/')
-                if len(parts) > 1:
-                    # 去掉第一部分（最外层目录）
-                    rel_path = '/'.join(parts[1:])
-                else:
-                    rel_path = file_path
-            else:
-                rel_path = file_path
-            
-            if rel_path:  # 确保不是空路径
-                # 保存到版本目录
-                target_version_path = version_dir / rel_path
-                target_version_path.parent.mkdir(parents=True, exist_ok=True)
-                file.save(str(target_version_path))
-
-def save_package_files_from_dir(package_name, version, source_dir):
-    """从源目录复制文件到版本目录"""
-    # 版本目录
-    version_dir = Path('pkgs') / package_name / version
-    version_dir.mkdir(parents=True, exist_ok=True)
-    
-    # 复制源目录下的所有文件到版本目录
-    for item in source_dir.rglob('*'):
-        if item.is_file():
-            # 保持相对路径
-            relative_path = item.relative_to(source_dir)
-            target_version_path = version_dir / relative_path
-            target_version_path.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(item, target_version_path)
-
-def delete_package(package_name):
-    """删除包及其所有版本"""
-    package_path = Path('pkgs') / package_name
-    if package_path.exists():
-        shutil.rmtree(str(package_path))
-    
-    conn = get_db()
-    conn.execute('DELETE FROM packages WHERE name = ?', (package_name,))
-    conn.commit()
-    conn.close()
-
-def extract_package_info(folder):
-    """带自动缓存失效的 package.json 读取"""
-    if not folder.exists():
+def get_package_json(folder: Path) -> dict | None:
+    path = folder / "package.json"
+    if not path.is_file():
         return None
-
-    mtime = folder.stat().st_mtime
-    return get_package_info(folder, mtime)
-
-@lru_cache(maxsize=256)
-def get_package_info(folder, mtime):
-    """从包文件夹中提取package.json信息"""
-    # 递归查找package.json
-    for root, dirs, files in os.walk(folder):
-        if 'package.json' in files:
-            package_json_path = Path(root) / 'package.json'
-            break
+    
+    data = json.loads(path.read_text("utf-8"))
+    if "name" in data and "version" in data:
+        return data
     else:
         return None
+
+def get_package_files(package_name, version):
+    """获取指定版本包的文件列表"""
+    from pathlib import Path
     
+    # 版本目录
+    package_dir = Path('pkgs') / package_name / version
+    
+    if not package_dir.exists():
+        return []
+    
+    files = []
     try:
-        with open(package_json_path, 'r', encoding='utf-8') as f:
-            data = json.load(f)
+        for file_path in package_dir.rglob('*'):
+            if file_path.is_file():
+                # 获取相对路径
+                rel_path = file_path.relative_to(package_dir)
+                # 获取文件大小
+                size = file_path.stat().st_size
+                # 格式化文件大小
+                if size < 1024:
+                    size_str = f"{size}B"
+                elif size < 1024 * 1024:
+                    size_str = f"{size/1024:.1f}KB"
+                else:
+                    size_str = f"{size/(1024*1024):.1f}MB"
+                
+                files.append({
+                    'name': str(rel_path),
+                    'size': size_str,
+                    'is_package_json': rel_path.name == 'package.json',
+                    'is_readme': rel_path.name.lower() in ['readme.md', 'readme.txt', 'readme'],
+                    'is_main': rel_path.name.lower() in ['main.py', '__init__.py']
+                })
         
-        # 验证必需字段
-        if 'name' not in data or 'version' not in data:
-            return None
-        else:
-            return data
-    except (json.JSONDecodeError, KeyError) as e:
-        app.logger.error(f'解析package.json失败: {str(e)}')
-        return None
+        # 按文件名排序
+        files.sort(key=lambda x: x['name'])
+        return files
+    except Exception as e:
+        app.logger.error(f'获取文件列表失败: {str(e)}')
+        return []
+
+def get_package_versions(package_name):
+    """获取包的全部版本"""
+    conn = get_db()
+
+    rows = conn.execute(
+        '''
+        SELECT version
+        FROM packages
+        WHERE name = ?
+        ORDER BY id DESC
+        ''',
+        (package_name,)
+    ).fetchall()
+
+    conn.close()
+
+    return [row['version'] for row in rows]
+
+def unzip(zip_path, dest):
+    """解压zip文件到目标目录"""
+    MAX_FILES = 2000
+    MAX_UNZIP_SIZE = 50 * 1024 * 1024
+
+    with zipfile.ZipFile(zip_path) as z:
+        infos = z.infolist()
+        if len(infos) > MAX_FILES:
+            raise ValueError("too many files")
+
+        total = 0
+        for info in infos:
+            path = Path(info.filename)
+
+            # 防路径攻击
+            if ".." in path.parts or path.is_absolute():
+                raise ValueError("invalid path")
+            # 防 symlink
+            mode = info.external_attr >> 16
+            if stat.S_ISLNK(mode):
+                raise ValueError("symlink not allowed")
+            # 防 zip bomb
+            total += info.file_size
+            if total > MAX_UNZIP_SIZE:
+                raise ValueError("zip too large")
+
+            target = dest / path
+            target.parent.mkdir(parents=True, exist_ok=True)
+            if info.is_dir():
+                target.mkdir(exist_ok=True)
+                continue
+            with z.open(info) as src, open(target, "wb") as dst:
+                shutil.copyfileobj(src, dst)
 
 # ---------- 路由 ----------
 @app.route('/')
@@ -204,15 +223,15 @@ def index():
     
     # 获取最新的包（按创建时间排序，每个包只取最新版本）
     recent_packages = conn.execute('''
-        SELECT p.*, u.login as owner_name 
-        FROM packages p 
-        JOIN users u ON p.owner_id = u.id 
-        WHERE p.created_at = (
-            SELECT MAX(created_at) 
-            FROM packages p2 
+        SELECT p.*, u.login AS owner_name
+        FROM packages p
+        JOIN users u ON p.owner_id = u.id
+        WHERE p.id = (
+            SELECT MAX(id)
+            FROM packages p2
             WHERE p2.name = p.name
         )
-        ORDER BY p.created_at DESC 
+        ORDER BY p.id DESC
         LIMIT 10
     ''').fetchall()
     
@@ -223,7 +242,7 @@ def index():
 
     for i, pkg in enumerate(recent_packages):
         pkg = dict(pkg)
-        info = extract_package_info(Path("pkgs") / pkg["name"] / pkg["version"])
+        info = get_package_json(Path("pkgs") / pkg["name"] / pkg["version"])
         if info:
             pkg.update(info)
         recent_packages[i] = pkg
@@ -372,22 +391,20 @@ def dashboard():
         SELECT p.*
         FROM packages p
         JOIN (
-            SELECT name, MAX(created_at) AS max_created
+            SELECT name, MAX(id) AS max_id
             FROM packages
             WHERE owner_id = ?
             GROUP BY name
         ) latest
-        ON p.name = latest.name
-        AND p.created_at = latest.max_created
-        WHERE p.owner_id = ?
-        ORDER BY p.created_at DESC
-    ''', (user['id'], user['id'])).fetchall()
+        ON p.id = latest.max_id
+        ORDER BY p.id DESC
+    ''', (user['id'],)).fetchall()
     
     conn.close()
     
     for i, pkg in enumerate(user_packages):
         pkg = dict(pkg)
-        info = extract_package_info(Path("pkgs") / pkg["name"] / pkg["version"])
+        info = get_package_json(Path("pkgs") / pkg["name"] / pkg["version"])
         if info:
             pkg.update(info)
         user_packages[i] = pkg
@@ -402,196 +419,73 @@ def upload():
     """上传包"""
     if request.method == 'GET':
         return render_template('upload.html', user=get_current_user())
-    
-    # POST 请求处理上传
+
     user = get_current_user()
-    
-    if 'files' not in request.files:
-        flash(_('没有选择文件'), 'error')
-        return redirect(request.url)
-    
     files = request.files.getlist('files')
-    
-    # 检查是否选择了文件
-    if not files or all(not file.filename for file in files):
+
+    if not files:
         flash(_('没有选择文件'), 'error')
         return redirect(request.url)
-    
-    # 创建临时目录保存上传的文件
+
     import tempfile
     import uuid
-    temp_dir = Path(tempfile.gettempdir()) / str(uuid.uuid4())
-    temp_dir.mkdir(parents=True)
-    
-    try:
-        # 保存上传的文件到临时目录，去掉最外层目录
-        file_paths = []
-        for file in files:
-            if file.filename:
-                file_paths.append(file.filename.replace('\\', '/'))
-        
-        if not file_paths:
-            flash(_('没有有效文件'), 'error')
-            return redirect(request.url)
-        
-        # 找到共同的前缀（最外层目录）
-        common_prefix = None
-        if all('/' in path for path in file_paths):
-            first_parts = [path.split('/')[0] for path in file_paths]
-            if len(set(first_parts)) == 1:
-                common_prefix = first_parts[0] + '/'
-        
-        # 保存文件，去掉共同的前缀
-        for file in files:
-            if file.filename:
-                file_path = file.filename.replace('\\', '/')
-                
-                if common_prefix and file_path.startswith(common_prefix):
-                    rel_path = file_path[len(common_prefix):]
-                else:
-                    rel_path = file_path
-                
-                if rel_path:
-                    target_path = temp_dir / rel_path
-                    target_path.parent.mkdir(parents=True, exist_ok=True)
-                    file.save(str(target_path))
-        
-        # 提取 package.json 信息
-        package_info = extract_package_info(temp_dir)
-        if not package_info:
-            flash(_('package.json 文件不存在或格式错误'), 'error')
-            return redirect(request.url)
-        
-        package_name = package_info['name']
-        package_version = package_info['version']
-        
-        # 检查是否已存在相同版本的包
-        conn = get_db()
-        existing = conn.execute(
-            'SELECT * FROM packages WHERE name = ? AND version = ?',
-            (package_name, package_version)
-        ).fetchone()
-        
-        if existing:
-            flash(_('包 %(name)s 版本 %(version)s 已存在', name=package_name, version=package_version), 'error')
-            return redirect(request.url)
-        
-        # 保存到数据库
-        cursor = conn.execute(
-            '''INSERT INTO packages (name, version, owner_id) 
-               VALUES (?, ?, ?)''',
-            (package_name, package_version, user['id'])
-        )
-        
-        conn.commit()
-        conn.close()
-        
-        # 保存包文件到版本目录
-        save_package_files_from_dir(package_name, package_version, temp_dir)
-        
-        flash(_('包 %(name)s %(version)s 上传成功!', name=package_name, version=package_version), 'success')
-        return redirect(url_for('package_detail', name=package_name, version=package_version))
-        
-    except Exception as e:
-        app.logger.error(f'上传包时出错: {str(e)}')
-        flash(_('上传失败: {}').format(str(e)), 'error')
-        return redirect(request.url)
-    finally:
-        # 清理临时目录
-        if temp_dir.exists():
-            shutil.rmtree(str(temp_dir))
 
-def get_package_files(package_name, version):
-    """获取指定版本包的文件列表"""
-    from pathlib import Path
-    
-    # 版本目录
-    package_dir = Path('pkgs') / package_name / version
-    
-    if not package_dir.exists():
-        return []
-    
-    files = []
-    try:
-        for file_path in package_dir.rglob('*'):
-            if file_path.is_file():
-                # 获取相对路径
-                rel_path = file_path.relative_to(package_dir)
-                # 获取文件大小
-                size = file_path.stat().st_size
-                # 格式化文件大小
-                if size < 1024:
-                    size_str = f"{size}B"
-                elif size < 1024 * 1024:
-                    size_str = f"{size/1024:.1f}KB"
-                else:
-                    size_str = f"{size/(1024*1024):.1f}MB"
-                
-                files.append({
-                    'name': str(rel_path),
-                    'size': size_str,
-                    'is_package_json': rel_path.name == 'package.json',
-                    'is_readme': rel_path.name.lower() in ['readme.md', 'readme.txt', 'readme'],
-                    'is_main': rel_path.name.lower() in ['main.py', '__init__.py']
-                })
-        
-        # 按文件名排序
-        files.sort(key=lambda x: x['name'])
-        return files
-    except Exception as e:
-        app.logger.error(f'获取文件列表失败: {str(e)}')
-        return []
+    for file in files:
+        temp_dir = Path(tempfile.gettempdir()) / str(uuid.uuid4())
+        temp_dir.mkdir()
 
-def get_latest_version(package_name):
-    """获取包的最新版本"""
-    conn = get_db()
-    latest = conn.execute(
-        'SELECT version FROM packages WHERE name = ? ORDER BY created_at DESC LIMIT 1',
-        (package_name,)
-    ).fetchone()
-    conn.close()
-    
-    return latest['version'] if latest else None
-
-def get_package_readme(package_name, version):
-    """获取指定版本的README内容"""
-    readme_path = Path('pkgs') / package_name / version / 'README.md'
-    if readme_path.exists():
         try:
-            with open(readme_path, 'r', encoding='utf-8') as f:
-                return f.read()
+            zip_path = temp_dir / "pkg.zip"
+            file.save(zip_path)
+
+            extract_dir = temp_dir / "extract"
+            extract_dir.mkdir()
+
+            unzip(zip_path, extract_dir)
+
+            info = get_package_json(extract_dir)
+
+            if not info:
+                flash(_('%(name)s 缺少package.json', name=file.filename), 'error')
+                continue
+
+            name = info["name"]
+            version = info["version"]
+
+            conn = get_db()
+
+            exists = conn.execute(
+                'SELECT 1 FROM packages WHERE name=? AND version=?',
+                (name, version)
+            ).fetchone()
+
+            if exists:
+                flash(_('%(name)s %(version)s 已存在', name=name, version=version), 'error')
+                conn.close()
+                continue
+
+            conn.execute(
+                'INSERT INTO packages (name, version, owner_id) VALUES (?, ?, ?)',
+                (name, version, user['id'])
+            )
+
+            conn.commit()
+            conn.close()
+
+            target = Path("pkgs") / name / version
+            target.parent.mkdir(parents=True, exist_ok=True)
+
+            shutil.move(str(extract_dir), str(target))
+
+            flash(_('%(name)s %(version)s 上传成功', name=name, version=version), 'success')
+
         except Exception as e:
-            app.logger.error(f'读取 README.md 失败: {str(e)}')
-    return None
-
-# 添加 markdown 渲染函数
-def render_markdown(content):
-    """渲染 Markdown 为 HTML"""
-    if not content:
-        return ""
-    
-    try:
-        html = markdown.markdown(
-            content,
-            extensions=[
-                "extra",
-                "codehilite",
-                "fenced_code",
-                "tables",
-                "toc"
-            ],
-            output_format="html5"
-        )
-        return html
-    except Exception as e:
-        app.logger.error(f"Markdown 渲染失败: {e}")
-        return f"<pre>{content}</pre>"
-
-# 添加 markdown 过滤器
-@app.template_filter('markdown')
-def markdown_filter(text):
-    """Jinja2 模板过滤器：将 markdown 转换为 HTML"""
-    return render_markdown(text)
+            app.logger.error(f"upload error: {e}")
+            flash(_('%(name)s 上传失败', name=file.filename), 'error')
+        finally:
+            # 清理临时目录
+            shutil.rmtree(temp_dir, ignore_errors=True)
+    return redirect(url_for('dashboard'))
 
 @app.route('/pkgs/<name>', strict_slashes=False)
 @app.route('/pkgs/<name>/<version>', strict_slashes=False)
@@ -601,11 +495,11 @@ def package_detail(name, version=None):
     
     # 获取包的所有版本信息
     package_versions = conn.execute('''
-        SELECT p.*, u.login as owner_name 
-        FROM packages p 
-        JOIN users u ON p.owner_id = u.id 
+        SELECT p.*, u.login AS owner_name
+        FROM packages p
+        JOIN users u ON p.owner_id = u.id
         WHERE p.name = ?
-        ORDER BY p.created_at DESC
+        ORDER BY p.id DESC
     ''', (name,)).fetchall()
     
     if not package_versions:
@@ -620,7 +514,7 @@ def package_detail(name, version=None):
     for pkg in package_versions:
         if pkg['version'] == version:
             current_package = dict(pkg)
-            info = extract_package_info(Path("pkgs") / name / version)
+            info = get_package_json(Path("pkgs") / name / version)
             if info:
                 current_package.update(info)
             break
@@ -630,10 +524,12 @@ def package_detail(name, version=None):
     
     conn.close()
     
-    # 获取该版本的README内容
-    readme_content = get_package_readme(name, version)
-    if readme_content:
-        readme_content = render_markdown(readme_content)
+    # 获取README内容并渲染
+    readme_path = Path('pkgs') / name / version / 'README.md'
+    readme_content = None
+    if readme_path.exists():
+        with open(readme_path, 'r', encoding='utf-8') as f:
+            readme_content = markdown.markdown(f.read(), extensions=["extra", "codehilite", "fenced_code", "tables", "toc"], output_format="html5")
     
     # 获取该版本的文件列表
     files = get_package_files(name, version)
@@ -695,8 +591,7 @@ def delete_package_version(name, version):
     else:
         flash(_('包 {} 版本 {} 已删除').format(name, version), 'success')
         # 重定向到最新版本
-        latest_version = get_latest_version(name)
-        return redirect(url_for('package_detail', name=name, version=latest_version))
+        return redirect(url_for('package_detail', name=name, version=get_package_versions(name)[0]))
 
 @app.route('/pkgs/<name>/<version>/download', strict_slashes=False)
 def download_package(name, version):
@@ -764,23 +659,23 @@ def search():
     # 使用LIKE进行简单搜索，返回每个包的最新版本
     search_pattern = f'%{query}%'
     results = conn.execute('''
-        SELECT p.*, u.login as owner_name 
-        FROM packages p 
-        JOIN users u ON p.owner_id = u.id 
-        WHERE (p.name LIKE ?)
-        AND p.created_at = (
-            SELECT MAX(created_at) 
-            FROM packages p2 
+        SELECT p.*, u.login AS owner_name
+        FROM packages p
+        JOIN users u ON p.owner_id = u.id
+        WHERE p.name LIKE ?
+        AND p.id = (
+            SELECT MAX(id)
+            FROM packages p2
             WHERE p2.name = p.name
         )
-        ORDER BY p.created_at DESC
+        ORDER BY p.id DESC
     ''', (search_pattern, )).fetchall()
     
     conn.close()
 
     for i, pkg in enumerate(results):
         pkg = dict(pkg)
-        info = extract_package_info(Path("pkgs") / pkg["name"] / pkg["version"])
+        info = get_package_json(Path("pkgs") / pkg["name"] / pkg["version"])
         if info:
             pkg.update(info)
         results[i] = pkg
@@ -789,6 +684,50 @@ def search():
                          query=query,
                          results=results,
                          user=get_current_user())
+
+@app.route('/api/search')
+def api_search():
+    """API 搜索接口"""
+    query = request.args.get('q', '').strip()
+
+    if not query:
+        return jsonify({
+            "query": query,
+            "results": []
+        })
+
+    conn = get_db()
+
+    search_pattern = f'%{query}%'
+
+    rows = conn.execute('''
+    SELECT name, version
+    FROM packages p
+    WHERE name LIKE ?
+    AND id = (
+        SELECT MAX(id)
+        FROM packages p2
+        WHERE p2.name = p.name
+    )
+    ''', (search_pattern,)).fetchall()
+
+    conn.close()
+
+    results = []
+
+    for row in rows:
+        name = row["name"]
+        version = row["version"]
+
+        results.append({
+            "name": name,
+            "url": f"https://upypi.net/pkgs/{name}/{version}"
+        })
+
+    return jsonify({
+        "query": query,
+        "results": results
+    })
 
 @app.route('/pkgs/<path:filename>')
 def serve_packages(filename):

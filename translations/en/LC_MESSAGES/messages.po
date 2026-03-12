@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PROJECT VERSION\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2026-03-06 19:40+0000\n"
+"POT-Creation-Date: 2026-03-12 20:49+0000\n"
 "PO-Revision-Date: 2026-03-06 19:33+0000\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language: en\n"
@@ -18,68 +18,65 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Generated-By: Babel 2.17.0\n"
 
-#: app.py:93
+#: app.py:95
 msgid "请先登录"
 msgstr "Please log in first"
 
-#: app.py:253 app.py:344
+#: app.py:305
+msgid "OAuth 认证失败 (state mismatch)"
+msgstr "OAuth authentication failed (state mismatch)"
+
+#: app.py:324
+msgid "OAuth token 错误"
+msgstr "OAuth token error"
+
+#: app.py:343
+msgid "GitHub 用户信息获取失败"
+msgstr "Failed to retrieve GitHub user information"
+
+#: app.py:373
 #, python-brace-format
 msgid "欢迎回来，{}!"
 msgstr "Welcome back, {}!"
 
-#: app.py:276
-msgid "OAuth 认证失败 (state mismatch)"
-msgstr "OAuth authentication failed (state mismatch)"
-
-#: app.py:295
-msgid "OAuth token 错误"
-msgstr "OAuth token error"
-
-#: app.py:314
-msgid "GitHub 用户信息获取失败"
-msgstr "Failed to retrieve GitHub user information"
-
-#: app.py:351
+#: app.py:380
 msgid "已成功退出登录"
 msgstr "Successfully logged out"
 
-#: app.py:398 app.py:405
+#: app.py:427
 msgid "没有选择文件"
 msgstr "No file selected"
 
-#: app.py:422
-msgid "没有有效文件"
-msgstr "No valid files"
+#: app.py:449
+#, fuzzy, python-format
+msgid "%(name)s 缺少package.json"
+msgstr "Must include a package.json file"
 
-#: app.py:450
-msgid "package.json 文件不存在或格式错误"
-msgstr "package.json file does not exist or is invalid"
-
-#: app.py:464
-#, python-format
-msgid "包 %(name)s 版本 %(version)s 已存在"
+#: app.py:463
+#, fuzzy, python-format
+msgid "%(name)s %(version)s 已存在"
 msgstr "Package %(name)s version %(version)s already exists"
 
 #: app.py:480
-#, python-format
-msgid "包 %(name)s %(version)s 上传成功!"
+#, fuzzy, python-format
+msgid "%(name)s %(version)s 上传成功"
 msgstr "Package %(name)s %(version)s uploaded successfully!"
 
-#: app.py:485
-#, python-brace-format
-msgid "上传失败: {}"
-msgstr "Upload failed: {}"
+#: app.py:484
+#, python-format
+msgid "%(name)s 上传失败"
+msgstr "Package %(name)s upload failed"
 
-#: app.py:651
+#: app.py:561
 msgid "包版本不存在或没有删除权限"
 msgstr "Package version does not exist or you do not have permission"
 
-#: app.py:679
+#: app.py:589
 #, python-brace-format
 msgid "包 {}的所有版本已删除"
 msgstr "All versions of package {} have been deleted"
 
-#: app.py:682
+#: app.py:592
 #, python-brace-format
 msgid "包 {} 版本 {} 已删除"
 msgstr "Package {} version {} has been deleted"
@@ -108,7 +105,7 @@ msgstr "Sorry, the server encountered an error. Please try again later."
 msgid "刷新页面"
 msgstr "Refresh Page"
 
-#: templates/base.html:7 templates/base.html:84
+#: templates/base.html:7 templates/base.html:84 templates/index.html:3
 msgid "MicroPython 包仓库"
 msgstr "MicroPython Package Repository"
 
@@ -116,7 +113,7 @@ msgstr "MicroPython Package Repository"
 msgid "我的面板"
 msgstr "My Dashboard"
 
-#: templates/base.html:98 templates/dashboard.html:15 templates/upload.html:40
+#: templates/base.html:98 templates/dashboard.html:15 templates/upload.html:45
 msgid "上传包"
 msgstr "Upload Package"
 
@@ -167,10 +164,6 @@ msgstr "You haven't uploaded any packages yet"
 #: templates/dashboard.html:73
 msgid "点击这里上传第一个包"
 msgstr "Click here to upload your first package"
-
-#: templates/index.html:3
-msgid "首页"
-msgstr "Home"
 
 #: templates/index.html:9
 msgid "一个类似 PyPI 的 MicroPython 包管理仓库。上传、分享和发现 MicroPython 包。"
@@ -258,7 +251,7 @@ msgstr "Confirm Delete Version"
 msgid "此操作将删除该版本的所有文件，且无法恢复！"
 msgstr "This will delete all files of this version and cannot be undone!"
 
-#: templates/package.html:183 templates/upload.html:37
+#: templates/package.html:183 templates/upload.html:42
 msgid "取消"
 msgstr "Cancel"
 
@@ -291,46 +284,65 @@ msgid "上传 MicroPython 包"
 msgstr "Upload MicroPython Package"
 
 #: templates/upload.html:17
-msgid "请选择包文件夹"
-msgstr "Please select a package folder"
+msgid "请选择zip包(可多选)"
+msgstr "Please select zip package(s) (multiple selections allowed)"
 
-#: templates/upload.html:24
+#: templates/upload.html:29
 msgid "已选择文件"
 msgstr "Selected files"
 
-#: templates/upload.html:29
+#: templates/upload.html:34
 msgid "上传要求"
 msgstr "Upload Requirements"
 
-#: templates/upload.html:31
-msgid "必须包含 package.json 文件"
+#: templates/upload.html:36
+#, fuzzy
+msgid "ZIP必须包含 package.json 文件"
 msgstr "Must include a package.json file"
 
-#: templates/upload.html:32
+#: templates/upload.html:37
 msgid "字段必须包含"
 msgstr "Required Fields"
 
-#: templates/upload.html:50
-msgid "包文件夹结构"
-msgstr "Package Folder Structure"
+#: templates/upload.html:55
+msgid "ZIP结构"
+msgstr "ZIP Structure"
 
-#: templates/upload.html:66
+#: templates/upload.html:71
 msgid "package.json 规范说明"
 msgstr "package.json Specification"
 
-#: templates/upload.html:71
+#: templates/upload.html:76
 msgid "最小必需字段"
 msgstr "Minimum Required Fields"
 
-#: templates/upload.html:79
+#: templates/upload.html:84
 msgid "MicroPython (mip) 解析字段"
 msgstr "MicroPython (mip) Fields"
 
-#: templates/upload.html:92
+#: templates/upload.html:97
 msgid "upypi平台扩展字段（可选）"
 msgstr "upypi Platform Extended Fields (Optional)"
 
-#: templates/upload.html:95
+#: templates/upload.html:100
 msgid "chips 表示该包依赖特定芯片，fw 表示依赖特定固件"
 msgstr "chips indicates hardware dependency, fw indicates firmware dependency"
+
+#~ msgid "没有有效文件"
+#~ msgstr "No valid files"
+
+#~ msgid "package.json 文件不存在或格式错误"
+#~ msgstr "package.json file does not exist or is invalid"
+
+#~ msgid "上传失败: {}"
+#~ msgstr "Upload failed: {}"
+
+#~ msgid "首页"
+#~ msgstr "Home"
+
+#~ msgid "请选择包文件夹"
+#~ msgstr "Please select a package folder"
+
+#~ msgid "包文件夹结构"
+#~ msgstr "Package Folder Structure"
 
