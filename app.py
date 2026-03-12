@@ -804,6 +804,85 @@ def page_not_found(e):
 def internal_server_error(e):
     return render_template('500.html', user=get_current_user()), 500
 
+@app.route('/api/v1/packages', strict_slashes=False)
+def api_v1_list_packages():
+    """
+    查询包列表（支持模糊搜索）
+    - GET /api/v1/packages?q={关键词} ：模糊搜索包
+    - GET /api/v1/packages           ：获取所有包（可选）
+    """
+    # 获取搜索关键词（无关键词则返回所有包）
+    query = request.args.get('q', '').strip()
+
+    conn = get_db()
+    # 构建SQL条件
+    if query:
+        search_pattern = f'%{query}%'
+        sql_where = "WHERE (p.name LIKE ?)"
+        sql_params = (search_pattern,)
+    else:
+        sql_where = ""
+        sql_params = ()
+
+    # 复用原有搜索逻辑，保证结果一致
+    results = conn.execute(f'''
+        SELECT p.*, u.login as owner_name 
+        FROM packages p 
+        JOIN users u ON p.owner_id = u.id 
+        {sql_where}
+        AND p.created_at = (
+            SELECT MAX(created_at) 
+            FROM packages p2 
+            WHERE p2.name = p.name
+        )
+        ORDER BY p.created_at DESC
+    ''', sql_params).fetchall()
+    conn.close()
+
+    # 整理返回格式（保持和原逻辑一致）
+    package_list = []
+    for pkg in results:
+        pkg_dict = dict(pkg)
+        info = extract_package_info(Path("pkgs") / pkg_dict["name"] / pkg_dict["version"])
+        package_list.append({
+            "name": pkg_dict["name"],
+            "latest_version": pkg_dict["version"],
+            "owner": pkg_dict["owner_name"],
+            "description": info.get("description", "") if info else "",
+            "install_url": f"https://upypi.net/pkgs/{pkg_dict['name']}/{pkg_dict['version']}"
+        })
+
+    # 返回JSON，带跨域头（公网设备端请求必需）
+    return json.dumps(package_list, ensure_ascii=False), 200, {
+        "Content-Type": "application/json",
+        "Access-Control-Allow-Origin": "*"
+    }
+
+@app.route('/api/v1/packages/<name>', strict_slashes=False)
+def api_v1_get_package(name):
+    """
+    获取单个包的详情（精确查询）
+    - GET /api/v1/packages/{name} ：根据包名精确查询
+    """
+    latest_version = get_latest_version(name)
+    if not latest_version:
+        return json.dumps({
+            "error": "Not Found",
+            "message": f"Package '{name}' does not exist"
+        }), 404, {"Content-Type": "application/json"}
+
+    # 构造规范的返回结构
+    return json.dumps({
+        "name": name,
+        "latest_version": latest_version,
+        "install_url": f"https://upypi.net/pkgs/{name}/{latest_version}",
+        "api_version": "v1",
+        "source_url": f"https://upypi.net/pkgs/{name}/{latest_version}"
+    }, ensure_ascii=False), 200, {
+        "Content-Type": "application/json",
+        "Access-Control-Allow-Origin": "*"
+    }
+
 if __name__ == '__main__':
     # 运行应用
     app.run(host="127.0.0.1", port=5000)
