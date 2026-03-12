@@ -48,17 +48,14 @@ msgid "没有选择文件"
 msgstr "No file selected"
 
 #: app.py:449
-#, fuzzy, python-format
 msgid "%(name)s 缺少package.json"
-msgstr "Must include a package.json file"
+msgstr "%(name)s is missing package.json"
 
 #: app.py:463
-#, fuzzy, python-format
 msgid "%(name)s %(version)s 已存在"
 msgstr "Package %(name)s version %(version)s already exists"
 
 #: app.py:480
-#, fuzzy, python-format
 msgid "%(name)s %(version)s 上传成功"
 msgstr "Package %(name)s %(version)s uploaded successfully!"
 
@@ -296,9 +293,8 @@ msgid "上传要求"
 msgstr "Upload Requirements"
 
 #: templates/upload.html:36
-#, fuzzy
 msgid "ZIP必须包含 package.json 文件"
-msgstr "Must include a package.json file"
+msgstr "ZIP must contain package.json file"
 
 #: templates/upload.html:37
 msgid "字段必须包含"
