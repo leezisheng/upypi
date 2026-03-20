@@ -14,10 +14,15 @@
                 <form method="post" enctype="multipart/form-data" id="uploadForm">
                     <div class="mb-4">
                         <label for="files" class="form-label">
-                            <strong>{% trans %}请选择包文件夹{% endtrans %}</strong>
+                            <strong>{% trans %}请选择zip包(可多选){% endtrans %}</strong>
                         </label>
-                        <input class="form-control" type="file" name="files" id="files" 
-                               multiple webkitdirectory directory required>
+                        <input class="form-control"
+                            type="file"
+                            name="files"
+                            id="files"
+                            accept=".zip"
+                            multiple
+                            required>
                     </div>
                     
                     <div id="fileList" class="mb-3" style="display: none;">
@@ -28,7 +33,7 @@
                     <div class="alert alert-info">
                         <h5><i class="bi bi-info-circle"></i> {% trans %}上传要求{% endtrans %}：</h5>
                         <ul>
-                            <li>{% trans %}必须包含 package.json 文件{% endtrans %}</li>
+                            <li>{% trans %}ZIP必须包含 package.json 文件{% endtrans %}</li>
                             <li><code>package.json</code> {% trans %}字段必须包含{% endtrans %}<code>name</code>,<code>version</code></li>
                         </ul>
                     </div>
@@ -47,11 +52,11 @@
         <div class="card mt-4">
             <div class="card-header">
                 <i class="bi bi-folder"></i>
-                {% trans %}包文件夹结构{% endtrans %}
+                {% trans %}ZIP结构{% endtrans %}
             </div>
 
             <div class="card-body">
-                <pre><code>example-package/
+                <pre><code>example-package.zip
         ├── package.json
         ├── README.md
         └── src/
